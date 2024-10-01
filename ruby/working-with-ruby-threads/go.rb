@@ -1,14 +1,16 @@
+# ruby -W0 working-with-ruby-threads/go.rb # Run with `-W0` flag to supress ruby warnings
+
 # TODO:
 # * Process.fork
-# * Celluloid
+# * gem 'celluloid'
+# * gem 'parallel'
+# * gem 'concurrent-ruby'
 # * googl for it?
 
 # An interesting task came out of my head, it's a follow up for Working With Ruby Threads book which I read recently: [LINK]
 # We do have an array which is called `numbers`` and we do have a jobs which are applied to each number of this array. My goal is to make all numbers to be processed as fast as possible and write each calculation result to the file
 
-numbers = (1..1000).to_a
-
-require 'benchmark'
+numbers = (1000..5000).to_a
 
 # There are two types of jobs:
 #   * sync_job - it's a cpu-bound (like factorial or fibonacci number calculation)
@@ -19,13 +21,15 @@ def sync_job(x)
 end
 
 def async_job(x)
-  value = rand(0.01..0.05)
+  value = rand(0.01..0.03)
   sleep(value)
   value
 end
 
-def job(sync, x)
-  sync ? sync_job(x) : async_job(x)
+# Uncomment the needed job below depending on the needs
+def job(x)
+  sync_job(x)
+  # async_job(x)
 end
 
 # Write to file
@@ -36,11 +40,11 @@ end
 
 # A sequential approach, using `each` to sequentially run all the calculations
 
-def sequential(ary, sync, filename)
+def sequential(ary, filename)
   file = File.new(filename, 'w')
 
   ary.each do |a|
-    result = job(sync, a)
+    result = job(a)
     _write_to_file(file, a, result)
   end
 end
@@ -50,13 +54,13 @@ end
 # Once mutex has been finished, we are focusing GIL on I/O bound writing to the file opeartion (semaphore.synchronize)
 # This case, it's guaranteed that only one thread will write to the file at certain moment of the time
 
-def mutex(ary, sync, filename)
+def mutex(ary, filename)
   file = File.new(filename, 'w')
   semaphore = Mutex.new
 
   ary.map do |a|
     Thread.new do
-      result = job(sync, a)
+      result = job(a)
 
       semaphore.synchronize do
         _write_to_file(file, a, result)
@@ -71,7 +75,7 @@ end
 # And, the working horse here: an array of ractors for each number. Any of these will be implemented on all cores of the computer.
 #
 
-def ractor(ary, sync, filename)
+def ractor(ary, filename)
   file = File.new(filename, 'w')
 
   writer = Ractor.new file do |file|
@@ -82,11 +86,17 @@ def ractor(ary, sync, filename)
   end
 
   ary.map do |a|
-    Ractor.new a, sync, writer do |a, sync, writer|
-      result = job(sync, a)
+    Ractor.new a, writer do |a, writer|
+      result = job(a)
       writer.send [a, result]
     end
   end.each(&:take)
+end
+
+def proc_fork(ary, filename)
+  file = File.new(filename, 'w')
+
+  raise "I don't fucking how to deal with it!"
 end
 
 # Let's start it sync!
@@ -96,10 +106,11 @@ end
 # mutex:        0.371738   0.268052   0.639790 (  0.678934)
 # ractor:       0.391240   0.121033   0.512273 (  0.202072)
 
-the_sync = false
+require 'benchmark'
 
 Benchmark.bm do |bm|
-  bm.report('sequential: ') { sequential(numbers, the_sync, 'sequential.txt') }
-  bm.report('mutex:      ') { mutex(numbers, the_sync, 'mutex.txt') }
-  bm.report('ractor:     ') { ractor(numbers, the_sync, 'ractor.txt') }
+  bm.report('sequential: ') { sequential(numbers, 'sequential.txt') }
+  bm.report('mutex:      ') { mutex(numbers, 'mutex.txt') }
+  bm.report('ractor:     ') { ractor(numbers, 'ractor.txt') }
+  # bm.report('proc_fork:  ') { proc_fork(numbers, 'proc_fork.txt') }
 end
