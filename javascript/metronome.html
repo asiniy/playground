@@ -21,22 +21,21 @@
       import htm from "https://unpkg.com/htm@latest?module";
       const html = htm.bind(React.createElement);
 
-      const STEP = 0.1
       const beep = new Audio('https://www.soundjay.com/buttons/beep-07a.wav')
 
       const Timer = ({ period }) => {
-        const [timeLeft, setTimeLeft] = React.useState(period)
+        const periodMs = period * 1000
+        const [startedAt, _] = React.useState(+new Date())
+        const [timeLeft, setTimeLeft] = React.useState(0)
 
         React.useEffect(() => {
           const timerInterval = setInterval(() => {
-            const newTimeLeft = Number((timeLeft - 0.1).toFixed(1))
-            if (newTimeLeft < 0) {
-              setTimeLeft(period)
+            const newTimeLeft = (periodMs - (+new Date() - startedAt) % periodMs) / 1000
+            if (newTimeLeft > timeLeft) {
               beep.play()
-            } else {
-              setTimeLeft(newTimeLeft)
             }
-          }, STEP * 1000)
+            setTimeLeft(newTimeLeft)
+          }, 1000 / 24) // TV FPS
           return () => clearInterval(timerInterval)
         })
 
@@ -52,7 +51,7 @@
           setPeriod(Number(value))
         }
 
-        return html`<input type="number" value=${value} onChange=${onChange} min="0" step="0.1" /><br /><button onClick=${onClick}>Start</button>`
+        return html`<input type="number" value=${value} onChange=${onChange} min="0" step="0.05" /><br /><button onClick=${onClick}>Start</button>`
       }
 
       const App = () => {
