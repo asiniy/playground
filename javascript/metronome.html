@@ -22,6 +22,7 @@
       const html = htm.bind(React.createElement);
 
       const beep = new Audio('https://www.soundjay.com/buttons/beep-07a.wav')
+      beep.volume = 0.2
 
       const Timer = ({ period }) => {
         const periodMs = period * 1000
